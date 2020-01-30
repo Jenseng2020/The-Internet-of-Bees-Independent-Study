@@ -92,7 +92,7 @@ void loop() {
   LoRa.endPacket();
   
   display.clearDisplay();
-  display.setCursor(31,32);
+  display.setCursor(35,32);
   display.println("LORA");
   display.setCursor(35,40);
   display.setTextSize(1);
