@@ -14,6 +14,7 @@
 
 //Libraries for sensors
 #include <HX711.h>
+#include <Adafruit_Si7021.h>
 
 //define the pins used by the LoRa transceiver module
 #define SCK 5
@@ -43,11 +44,20 @@
 //packet counter
 int counter = 0;
 
+//Raw scale value
+long scaleRaw;
+
+float temp;
+float humidity;
+
 //Initialize Oled
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RST);
 
 //Initialize HX711
 HX711 scale;
+
+//Initialize si7021
+Adafruit_Si7021 si7021 = Adafruit_Si7021();
 
 void setup() {
 
@@ -107,14 +117,18 @@ void setup() {
 }
 
 void loop() {
-   
+
+  getRawWeight();
+  getTemp();
+  getHumidity();
+  
   Serial.print("Sending packet: ");
-  Serial.println(counter);
 
   //Send LoRa packet to receiver
   LoRa.beginPacket();
-  LoRa.print("hello ");
-  LoRa.print(counter);
+  LoRa.print(scaleRaw);
+  LoRa.print(temp);
+  LoRa.print(humidity);
   LoRa.endPacket();
   
   display.clearDisplay();
@@ -130,4 +144,32 @@ void loop() {
   counter++;
   
   delay(1000);
+}
+
+void getTemp()
+{
+  temp = sensor.readTemperature();
+  Serial.println("\tTemperature: ");
+  Serial.print(temp, 2);
+}
+
+void getHumidity()
+{
+  humidity = sensor.readHumidity();
+  Serial.println("Humidity:    ");
+  Serial.print(humidity, 2);
+}
+
+void getRawWeight()
+{
+  if (scale.is_ready()) 
+  {
+    scaleRaw = scale.read();
+    Serial.println("HX711 reading: ");
+    Serial.print(scaleRaw);
+  } 
+  else 
+  {
+    Serial.println("HX711 not found.");
+  }
 }
