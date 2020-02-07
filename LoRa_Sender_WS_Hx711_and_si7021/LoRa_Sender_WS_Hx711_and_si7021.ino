@@ -93,6 +93,7 @@ void setup()
 
 void loop() 
 {
+  Serial.println();
   Serial.print("Counter = ");
   Serial.println(counter);
   sendLoraPacket(getRawWht(),getTemp(),getHumx());
@@ -125,11 +126,20 @@ void sendLoraPacket (long rawWht, float temp, float humx)
 {
   Serial.println("In LoRa Func");
   Serial.print("Sending packet: ");
+  
   LoRa.beginPacket();
   LoRa.print(rawWht);
+  LoRa.print("/");
   LoRa.print(temp);
+  LoRa.print("/");
   LoRa.print(humx);
   LoRa.endPacket();
-  Serial.println("sent");
   
+  Serial.println("sent");
+  Serial.print("Raw Weight: ");
+  Serial.print(rawWht);
+  Serial.print("\tTemp: ");
+  Serial.print(temp);
+  Serial.print("\tHumidity: ");
+  Serial.println(humx);
 }
