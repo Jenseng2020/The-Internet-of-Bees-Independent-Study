@@ -1,5 +1,3 @@
-#include <StringTokenizer.h>
-
 /*********
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/ttgo-lora32-sx1276-arduino-ide/
@@ -8,6 +6,9 @@
 //Libraries for LoRa
 #include <SPI.h>
 #include <LoRa.h>
+
+//string tokenizer library
+#include <StringTokenizer.h>
 
 //define the pins used by the LoRa transceiver module
 #define SCK 5
@@ -23,6 +24,10 @@
 #define BAND 915E6
 
 String LoRaData;
+
+float temp;
+float humx;
+long rawWht
 
 void setup() { 
   
@@ -49,17 +54,19 @@ void loop() {
 
   //try to parse packet
   int packetSize = LoRa.parsePacket();
-  if (packetSize) {
+  if (packetSize) 
+  {
     //received a packet
     Serial.print("Received packet ");
 
     //read packet
-    while (LoRa.available()) {
+    while (LoRa.available()) 
+    {
       LoRaData = LoRa.readString();
-      Serial.print(LoRaData);
+      Serial.println(LoRaData);
     }
 
-  TokenizeString(LoraData);
+    tokenizeString(LoraData);
 
     //print RSSI of packet
     int rssi = LoRa.packetRssi();
@@ -67,3 +74,5 @@ void loop() {
     Serial.println(rssi);
   }
 }
+
+tokenizeString
