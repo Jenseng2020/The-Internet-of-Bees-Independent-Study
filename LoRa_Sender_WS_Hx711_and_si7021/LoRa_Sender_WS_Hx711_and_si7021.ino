@@ -96,7 +96,7 @@ void loop()
   Serial.println();
   Serial.print("Counter = ");
   Serial.println(counter);
-  sendLoraPacket(getRawWht(),getTemp(),getHumx());
+  sendLoraPacket(getRawWht(),getTemp(),getHumx(),counter);
   counter++;
   delay(2000);
 }
@@ -122,7 +122,7 @@ long getRawWht()
   return scaleRaw;
 }
 
-void sendLoraPacket (long rawWht, float temp, float humx)
+void sendLoraPacket (long rawWht, float temp, float humx, int counter)
 {
   Serial.println("In LoRa Func");
   Serial.print("Sending packet: ");
@@ -133,6 +133,8 @@ void sendLoraPacket (long rawWht, float temp, float humx)
   LoRa.print(temp);
   LoRa.print("/");
   LoRa.print(humx);
+  LoRa.print("/");
+  LoRa.print(counter);
   LoRa.endPacket();
   
   Serial.println("sent");
