@@ -23,11 +23,12 @@
 //915E6 for North America
 #define BAND 915E6
 
-String LoRaData;
+String loraData;
 
-float temp;
-float humx;
-long rawWht
+float rawTemp;
+float rawHumx;
+long rawWht;
+int counter;
 
 void setup() { 
   
@@ -62,17 +63,34 @@ void loop() {
     //read packet
     while (LoRa.available()) 
     {
-      LoRaData = LoRa.readString();
-      Serial.println(LoRaData);
+      loraData = LoRa.readString();
+      Serial.println(loraData);
     }
 
-    tokenizeString(LoraData);
-
-    //print RSSI of packet
     int rssi = LoRa.packetRssi();
-    Serial.print(" with RSSI ");    
+    Serial.print("with RSSI ");    
     Serial.println(rssi);
+
+    tokenizeString(loraData);
+
+    Serial.println();
+    delay(2000);
   }
 }
 
-tokenizeString
+void tokenizeString(String loraString)
+{
+  StringTokenizer tokens(loraString, "/");
+  rawWht = tokens.nextToken().toInt();
+  rawTemp = tokens.nextToken().toFloat();
+  rawHumx = tokens.nextToken().toFloat();
+  counter = tokens.nextToken().toInt();
+  Serial.print("Raw Weight: ");
+  Serial.println(rawWht);
+  Serial.print("Raw Temp: ");
+  Serial.println(rawTemp);
+  Serial.print("Raw Humidity: ");
+  Serial.println(rawHumx);
+  Serial.print("Counter: ");
+  Serial.println(counter);
+}
