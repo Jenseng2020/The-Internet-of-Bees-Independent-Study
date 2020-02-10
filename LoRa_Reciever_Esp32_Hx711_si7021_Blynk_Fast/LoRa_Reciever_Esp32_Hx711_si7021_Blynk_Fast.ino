@@ -111,6 +111,9 @@ void getData()
     delay(2000);
 
     Blynk.virtualWrite(V0, rawWht);
+    Blynk.virtualWrite(V1, rawTemp);
+    Blynk.virtualWrite(V2, rawHumx);
+    Blynk.virtualWrite(V3, counter);
   }
 }
 
