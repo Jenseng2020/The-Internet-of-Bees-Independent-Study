@@ -10,6 +10,10 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 
+//webhook Libraries
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
 //Blynk Library
 #include <BlynkSimpleEsp32.h>
 
@@ -26,26 +30,139 @@
 #define BAND 915E6
 
 //blynk Variables
-char auth[] = "rC8MTOyvwXUT8EzPTRW5ZWQyRRsuYxNB";
+const char auth[] = "rC8MTOyvwXUT8EzPTRW5ZWQyRRsuYxNB";
 
 //Wifi Variables
-char ssid[] = "Team Donut";
-char pass[] = "EmmaandFred"; // set to "" for open networks
+const char ssid[] = "Team Donut";
+const char pass[] = "EmmaandFred"; // set to "" for open networks
+
+//webhook Variables
+const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=Pikesville,us&appid=";
+const String key = "086031d405d348826a118a7d6a4484f9";
+String jsonPayload;
+float outsideTempK;
+float outsideTempC;
+float outsideTempF;
+int outsidePressure;
+int outsideHumx;
 
 //lora Variables
 String loraData;
 
 //si7021 variables
-float rawTemp;
-float rawHumx;
+float hiveTempC;
+float hiveTempF;
+float hiveHumx;
 
 //HX711 Variables
 long rawWht;
 
+//cycle counter
 int counter;
 
 //create timers
+#define loraInterval 75
+#define weatherInterval 60000
 BlynkTimer loraTimer;
+BlynkTimer weatherTimer;
+
+void getHiveData()
+{
+  int packetSize = LoRa.parsePacket();
+  if (packetSize) 
+  {
+    //received a packet
+    Serial.print("Received packet ");
+
+    //read packet
+    while (LoRa.available()) 
+    {
+      loraData = LoRa.readString();
+      Serial.println(loraData);
+    }
+
+    int rssi = LoRa.packetRssi();
+    Serial.print("with RSSI ");    
+    Serial.println(rssi);
+
+    tokenizeLoraString(loraData);
+
+    Serial.println();
+    delay(2000);
+
+    Blynk.virtualWrite(V0, rawWht);
+    Blynk.virtualWrite(V1, hiveTempF);
+    Blynk.virtualWrite(V2, hiveHumx);
+    Blynk.virtualWrite(V3, counter);
+  }
+}
+
+void tokenizeLoraString(String loraString)
+{
+  char strBuffer[loraString.length()+1] = "";
+  loraString.toCharArray(strBuffer, loraString.length()+1); // example: "\"45.3\""
+  rawWht = atoi(strtok(strBuffer, "/"));
+  hiveTempC = atof(strtok(NULL, "/"));
+  hiveHumx = atof(strtok(NULL, "/"));
+  counter = atoi(strtok(NULL, "/"));
+
+  hiveTempF = (hiveTempC * (9/5)) + 32;
+  
+  Serial.print("Raw Weight: ");
+  Serial.println(rawWht);
+  Serial.print("Hive Temp F: ");
+  Serial.println(hiveTempF);
+  Serial.print("Hive Humidity: ");
+  Serial.println(hiveHumx);
+  Serial.print("Counter: ");
+  Serial.println(counter);
+}
+
+void getWeatherData()
+{
+  if ((WiFi.status() == WL_CONNECTED)) 
+  { 
+    HTTPClient http;
+    http.begin(endpoint + key); //Specify the URL
+    int httpCode = http.GET();  //Make the request
+    if (httpCode > 0) 
+    { //Check for the returning code
+        jsonPayload = http.getString();
+        Serial.println(httpCode);
+        Serial.println(jsonPayload);
+        parseWeatherData(jsonPayload);
+    }
+    else 
+    {
+      Serial.println("Error on HTTP request");
+    }
+    http.end(); //Free the resources
+  }
+  else
+  {
+    Serial.println("Wifi Error");
+  }
+}
+
+void parseWeatherData(String jsonString)
+{
+  const size_t capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(1) + 2*JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(6) + JSON_OBJECT_SIZE(14) + 440;
+  DynamicJsonBuffer jsonBuffer(capacity);
+  
+  const char* json = jsonString.c_str();
+  
+  JsonObject& root = jsonBuffer.parseObject(json);
+  
+  JsonObject& main = root["main"];
+  outsideTempK = main["temp"]; 
+  outsideTempC = outsideTempK - 273.15;
+  outsideTempF = (outsideTempC * (9/5)) + 32;
+  outsidePressure = main["pressure"]; 
+  outsideHumx = main["humidity"]; 
+  Serial.println(outsideTempF);
+  Serial.println(outsidePressure);
+  Serial.println(outsideHumx);
+}
 
 void setup() 
 { 
@@ -76,61 +193,13 @@ void setup()
   Serial.println("Blynk Initializing OK!");
 
   //Initialize Timers
-  loraTimer.setInterval(75, getData); 
+  loraTimer.setInterval(loraInterval, getHiveData);
+  weatherTimer.setInterval(weatherInterval, getWeatherData); 
 }
 
 void loop() 
 {
   loraTimer.run();
+  weatherTimer.run();
   Blynk.run();
-}
-
-void getData()
-{
-  int packetSize = LoRa.parsePacket();
-  if (packetSize) 
-  {
-    //received a packet
-    Serial.print("Received packet ");
-
-    //read packet
-    while (LoRa.available()) 
-    {
-      loraData = LoRa.readString();
-      Serial.println(loraData);
-    }
-
-    int rssi = LoRa.packetRssi();
-    Serial.print("with RSSI ");    
-    Serial.println(rssi);
-
-    tokenizeString(loraData);
-
-    Serial.println();
-    delay(2000);
-
-    Blynk.virtualWrite(V0, rawWht);
-    Blynk.virtualWrite(V1, rawTemp);
-    Blynk.virtualWrite(V2, rawHumx);
-    Blynk.virtualWrite(V3, counter);
-  }
-}
-
-void tokenizeString(String loraString)
-{
-  char strBuffer[loraString.length()+1] = "";
-  loraString.toCharArray(strBuffer, loraString.length()+1); // example: "\"45.3\""
-  rawWht = atoi(strtok(strBuffer, "/"));
-  rawTemp = atof(strtok(NULL, "/"));
-  rawHumx = atof(strtok(NULL, "/"));
-  counter = atoi(strtok(NULL, "/"));
-  
-  Serial.print("Raw Weight: ");
-  Serial.println(rawWht);
-  Serial.print("Raw Temp: ");
-  Serial.println(rawTemp);
-  Serial.print("Raw Humidity: ");
-  Serial.println(rawHumx);
-  Serial.print("Counter: ");
-  Serial.println(counter);
 }
