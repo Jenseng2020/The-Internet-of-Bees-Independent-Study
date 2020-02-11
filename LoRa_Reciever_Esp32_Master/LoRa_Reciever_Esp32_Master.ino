@@ -10,6 +10,10 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 
+//webhook Libraries
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
 //Blynk Library
 #include <BlynkSimpleEsp32.h>
 
@@ -26,18 +30,29 @@
 #define BAND 915E6
 
 //blynk Variables
-char auth[] = "rC8MTOyvwXUT8EzPTRW5ZWQyRRsuYxNB";
+const char auth[] = "rC8MTOyvwXUT8EzPTRW5ZWQyRRsuYxNB";
 
 //Wifi Variables
-char ssid[] = "Team Donut";
-char pass[] = "EmmaandFred"; // set to "" for open networks
+const char ssid[] = "Team Donut";
+const char pass[] = "EmmaandFred"; // set to "" for open networks
+
+//webhook Variables
+const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=Pikesville,us&appid=";
+const String key = "086031d405d348826a118a7d6a4484f9";
+String jsonPayload;
+float outsideTempK;
+float outsideTempC;
+float outsideTempF;
+int outsidePressure;
+int outsideHumx;
 
 //lora Variables
 String loraData;
 
 //si7021 variables
-float rawTemp;
-float rawHumx;
+float hiveTempC;
+float hiveTempF;
+float hiveHumx;
 
 //HX711 Variables
 long rawWht;
@@ -48,57 +63,26 @@ long scaleFactor;
 long offset;
 long tareOffset;
 
+//cycle counter
 int counter;
 
 <<<<<<< Updated upstream
 //create timers
+#define loraInterval 75
+#define weatherInterval 60000
 BlynkTimer loraTimer;
+<<<<<<< HEAD
 =======
 //create timer
 #define weatherInterval 900000L
 BlynkTimer timer;
 int weatherTimer = 1;
 >>>>>>> Stashed changes
+=======
+BlynkTimer weatherTimer;
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
 
-void setup() 
-{ 
-  //initialize Serial Monitor
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.println("LoRa Receiver Push to Blynk Test");
-  
-  //Setup lora pins
-  SPI.begin(SCK, MISO, MOSI, SS);//SPI LoRa pins
-  LoRa.setPins(SS, RST, DIO0);//setup LoRa transceiver module
-
-  //Initialize Lora
-  if (!LoRa.begin(BAND)) 
-  {
-    Serial.println("Starting LoRa failed!");
-    while (1);
-  }
-  Serial.println("LoRa Initializing OK!");
-
-  //Initialize Blynk
-  Blynk.begin(auth, ssid, pass);
-  if (!Blynk.connected()) 
-  {
-    Serial.println("Starting Blynk failed!");
-    while (1);
-  }
-  Serial.println("Blynk Initializing OK!");
-
-  //Initialize Timers
-  loraTimer.setInterval(75, getData); 
-}
-
-void loop() 
-{
-  loraTimer.run();
-  Blynk.run();
-}
-
-void getData()
+void getHiveData()
 {
     //received a packet
     Serial.print("Received packet ");
@@ -114,15 +98,19 @@ void getData()
     Serial.print("with RSSI ");    
     Serial.println(rssi);
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
     tokenizeString(loraData);
+=======
+    tokenizeLoraString(loraData);
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
 
     Serial.println();
     delay(2000);
 
     Blynk.virtualWrite(V0, rawWht);
-    Blynk.virtualWrite(V1, rawTemp);
-    Blynk.virtualWrite(V2, rawHumx);
+    Blynk.virtualWrite(V1, hiveTempF);
+    Blynk.virtualWrite(V2, hiveHumx);
     Blynk.virtualWrite(V3, counter);
   }
 =======
@@ -133,24 +121,27 @@ void getData()
 >>>>>>> Stashed changes
 }
 
-void tokenizeString(String loraString)
+void tokenizeLoraString(String loraString)
 {
   char strBuffer[loraString.length()+1] = "";
   loraString.toCharArray(strBuffer, loraString.length()+1); // example: "\"45.3\""
   rawWht = atoi(strtok(strBuffer, "/"));
-  rawTemp = atof(strtok(NULL, "/"));
-  rawHumx = atof(strtok(NULL, "/"));
+  hiveTempC = atof(strtok(NULL, "/"));
+  hiveHumx = atof(strtok(NULL, "/"));
   counter = atoi(strtok(NULL, "/"));
+
+  hiveTempF = (hiveTempC * (9/5)) + 32;
   
   Serial.print("Raw Weight: ");
   Serial.println(rawWht);
-  Serial.print("Raw Temp: ");
-  Serial.println(rawTemp);
-  Serial.print("Raw Humidity: ");
-  Serial.println(rawHumx);
+  Serial.print("Hive Temp F: ");
+  Serial.println(hiveTempF);
+  Serial.print("Hive Humidity: ");
+  Serial.println(hiveHumx);
   Serial.print("Counter: ");
   Serial.println(counter);
 }
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
 
@@ -160,6 +151,8 @@ void processWeight()
   noTareWeightLbs = rawWeightLbs - offset;
   weightLbs = noTareWeightLbs - tareOffset;
 }
+=======
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
 
 void getWeatherData()
 {
@@ -207,6 +200,7 @@ void parseWeatherData(String jsonString)
   Serial.println(outsideHumx);
 }
 
+<<<<<<< HEAD
 void pushBlynkData()
 {
     Blynk.virtualWrite(V0, counter);
@@ -218,6 +212,8 @@ void pushBlynkData()
     Blynk.virtualWrite(V6, outsidePressure); 
 }
 
+=======
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
 void setup() 
 { 
   //initialize Serial Monitor
@@ -246,14 +242,21 @@ void setup()
   }
   Serial.println("Blynk Initializing OK!");
 
+<<<<<<< HEAD
   getWeatherData();
   
   //Initialize Timers
   weatherTimer = timer.setInterval(weatherInterval, getWeatherData); 
+=======
+  //Initialize Timers
+  loraTimer.setInterval(loraInterval, getHiveData);
+  weatherTimer.setInterval(weatherInterval, getWeatherData); 
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
 }
 
 void loop() 
 {
+<<<<<<< HEAD
   
   timer.run();
   Blynk.run();
@@ -265,3 +268,9 @@ void loop()
   }
 }
 >>>>>>> Stashed changes
+=======
+  loraTimer.run();
+  weatherTimer.run();
+  Blynk.run();
+}
+>>>>>>> 0e1bd378aa8626521261d23d50cf04bbe5b6f91a
