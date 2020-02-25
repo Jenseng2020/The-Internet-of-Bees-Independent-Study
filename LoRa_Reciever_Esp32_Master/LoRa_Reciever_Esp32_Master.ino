@@ -36,11 +36,13 @@
 //blynk Variables
 const char auth[] = "rC8MTOyvwXUT8EzPTRW5ZWQyRRsuYxNB";
 const char server[] = "45.55.96.146";
-const int port = 443;
+const int port = 8080;
 
 //Wifi Variables
-const char ssid[] = "Team Donut";
-const char pass[] = "EmmaandFred"; // set to "" for open networks
+//const char ssid[] = "Team Donut";
+//const char pass[] = "EmmaandFred"; // set to "" for open networks
+const char ssid[] = "Park School";
+const char pass[] = "";
 
 //webhook Variables
 const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=Pikesville,us&appid=";
@@ -71,6 +73,9 @@ long tareOffset = 0;
 
 //cycle counter
 int counter;
+
+//Transmission interval
+int interval = 1;
 
 //Blynk Terminal variables
 WidgetTerminal terminal(V7);
@@ -215,6 +220,8 @@ void writeEEPROM()
   eeAddress += sizeof(offset);
   EEPROM.put(eeAddress, tareOffset);
   eeAddress += sizeof(tareOffset);
+  EEPROM.put(eeAddress, interval);
+  eeAddress += sizeof(interval);
 }
 
 void readEEPROM()
@@ -226,9 +233,22 @@ void readEEPROM()
   eeAddress += sizeof(offset);
   EEPROM.get(eeAddress, tareOffset);
   eeAddress += sizeof(tareOffset);
+  EEPROM.get(eeAddress, interval);
+  eeAddress += sizeof(interval);
 }
 
-
+void sendLoraPacket (String packet)
+{
+  Serial.println("In LoRa send Func");
+  Serial.println("Sending packet: ");
+  
+  LoRa.beginPacket();
+  LoRa.print(packet);
+  LoRa.endPacket();
+  
+  Serial.print("sent: ");
+  Serial.println(packet);
+}
 
 /************************************************/
 /**************** Setup Function ****************/
@@ -272,6 +292,7 @@ void setup()
   }
   Serial.println("Blynk Initializing OK!");
 
+  readEEPROM();
 
   getWeatherData();
 
@@ -363,9 +384,24 @@ BLYNK_WRITE(V7)
     terminal.println("3~val");
     terminal.println("==> Sets scale tareOffset to val");
     terminal.println(" ");
+    terminal.println("4~val");
+    terminal.println("==> Sets transmission interval to val");
+    terminal.println(" ");
+    terminal.println("hive reset");
+    terminal.println("==> Resets hive controller");
+    terminal.println(" ");
     terminal.println("Text or call Jensen at 410-390-1670 for more help");
     terminal.flush();
   }
+
+  if (terminalString == String("hive reset"))
+  {
+    sendLoraPacket(terminalString);
+    terminal.println(terminalString);
+    terminal.println("==> Hive reset command sent");
+    terminal.flush();
+  }
+  
   if (terminalString.indexOf('~') != -1)
   {
     terminal.println(" ");
@@ -397,6 +433,14 @@ BLYNK_WRITE(V7)
       tareOffset = value;
       writeEEPROM();
       terminal.println("==> tareOffset written");
+      terminal.flush();
+    }
+    if (operation == 4)
+    {
+      interval = value;
+      sendLoraPacket(terminalString);
+      terminal.println(terminalString);
+      terminal.println("==> interval update sent");
       terminal.flush();
     }
   }
