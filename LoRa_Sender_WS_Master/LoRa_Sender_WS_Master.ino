@@ -2,6 +2,7 @@
   Rui Santos
   Complete project details at https://RandomNerdTutorials.com/ttgo-lora32-sx1276-arduino-ide/
 *********/
+#include <Preferences.h>
 
 //Libraries for LoRa
 #include <SPI.h>
@@ -34,8 +35,14 @@
 #define HX711_DOUT 12 
 #define HX711_SCK 13
 
+//Lora Data
+String loraData;
+
 //packet counter
 int counter = 0;
+
+//transmission interval delay
+int intervalDelay = 1000;
 
 //Raw scale value
 long scaleRaw;
@@ -45,6 +52,10 @@ HX711 scale;
 
 //Initialize si7021
 Adafruit_Si7021 si7021 = Adafruit_Si7021();
+
+Preferences preferences;
+
+void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
 void setup() 
 {
@@ -89,43 +100,51 @@ void setup()
   Serial.println("si7021 Initializing OK!");
   }
   delay(1000);
+
+  readPersistent();
 }
 
 void loop() 
 {
+  int packetSize = LoRa.parsePacket();
+  Serial.println(packetSize);
+  if (packetSize)
+  {
+    readLoraPacket();
+  }
   Serial.println();
   Serial.print("Counter = ");
   Serial.println(counter);
   sendLoraPacket(getRawWht(),getTemp(),getHumx(),counter);
   counter++;
-  delay(2000);
+  delay(intervalDelay);
 }
 
 float getTemp()
 {
-  Serial.println("In temp func");
+//  Serial.println("In temp func");
   float temp = si7021.readTemperature();
   return temp;
 }
 
 float getHumx()
 {
-  Serial.println("In humx func");
+//  Serial.println("In humx func");
   float humx = si7021.readHumidity();
   return humx;
 }
 
 long getRawWht()
 {
-  Serial.println("In raw weight func");
+//  Serial.println("In raw weight func");
   long scaleRaw = scale.read();
   return scaleRaw;
 }
 
 void sendLoraPacket (long rawWht, float temp, float humx, int counter)
 {
-  Serial.println("In LoRa Func");
-  Serial.print("Sending packet: ");
+  //Serial.println("In LoRa Func");
+//  Serial.print("Sending packet: ");
   
   LoRa.beginPacket();
   LoRa.print(rawWht);
@@ -136,12 +155,71 @@ void sendLoraPacket (long rawWht, float temp, float humx, int counter)
   LoRa.print("/");
   LoRa.print(counter);
   LoRa.endPacket();
-  
+
+  LoRa.receive();
+
+  /*
   Serial.println("sent");
   Serial.print("Raw Weight: ");
   Serial.print(rawWht);
   Serial.print("\tTemp: ");
   Serial.print(temp);
   Serial.print("\tHumidity: ");
-  Serial.println(humx);
+  Serial.println(humx);*/
+}
+
+void readLoraPacket()
+{
+  //received a packet
+  Serial.print("Received packet ");
+
+  //read packet
+  while (LoRa.available())
+  {
+    loraData = LoRa.readString();
+    Serial.println(loraData);
+  }
+
+  int rssi = LoRa.packetRssi();
+  Serial.print("with RSSI ");
+  Serial.println(rssi);
+
+  if(loraData == String("hive reset"))
+  {
+    resetFunc();
+  }
+
+  if (loraData.indexOf('~') != -1)
+  {  
+    Serial.println("In set function");
+    int stringLength = loraData.length() + 1;
+    char strBuffer[stringLength] = "";
+    loraData.toCharArray(strBuffer, stringLength);
+    int operation = atoi(strtok(strBuffer, "\"~"));
+    int value = atoi(strtok(NULL, "~"));
+
+    if (operation == 4)
+    {
+      intervalDelay = value * 1000;
+      writePersistent();
+      Serial.println(intervalDelay);
+      Serial.println("==> delay interval written");
+    }
+  }
+}
+
+void writePersistent()
+{
+  preferences.begin("persistent", false);
+  preferences.putUInt("intervalDelay", intervalDelay);
+  preferences.end();
+}
+
+void readPersistent()
+{
+  preferences.begin("persistent", false);
+  intervalDelay = preferences.getUInt("intervalDelay", 1000);
+  Serial.print("Transmission interval: ");
+  Serial.println(intervalDelay);
+  preferences.end();
 }
