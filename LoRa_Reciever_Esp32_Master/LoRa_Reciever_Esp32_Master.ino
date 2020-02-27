@@ -260,12 +260,17 @@ void sendLoraPacket (String packet)
 
 void twitterFunc(int bypass)
 {
+  
   if (((hour() == 15) && (tweetEnable) && (tweet)) || (bypass == 1))
   {
+    terminal.println("==> in twitterFunc");
+    Serial.println("==> in twitterFunc");
     String strWeight = String(int(weightLbs));
     String strHumidity = String(int(hiveHumx));
     String strHiveTemp = String(int(hiveTempF));
     String strOutsideTemp = String(int(outsideTempF));
+    terminal.println("==> Tweeting");
+    Serial.println("==> Tweeting");
     Blynk.tweet("Today's Beehive report! \n Current hive weight (lbs) = " + strWeight + "\n Current hive humidity (%RH) = " + strHumidity + "\n Current hive temp (F) = " + strHiveTemp + "\n Current outside temp (F) = " + strOutsideTemp + "\n report tag: " + random(10, 000));
     tweet = false;
   }
@@ -385,7 +390,7 @@ BLYNK_WRITE(V7)
   }
   if (String("tweet") == terminalString)
   {
-    twitter Func(1);
+    twitterFunc(1);
   }
   if (String("tweetEnable") == terminalString)
   {
@@ -606,7 +611,7 @@ BLYNK_WRITE(V10)
 {
   if (lockKey == lockCode)
   {
-    sendLoraPacket("reset hive");
+    sendLoraPacket("hive reset");
     terminal.println("==> Going down for reset now!");
   }
   else
