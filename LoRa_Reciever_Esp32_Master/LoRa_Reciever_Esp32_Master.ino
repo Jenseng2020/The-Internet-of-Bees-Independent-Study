@@ -14,12 +14,14 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-//eeprom library
-#include <EEPROM.h>
+//preferences library
+#include <Preferences.h>
 
 //Blynk Library
 #include <BlynkSimpleEsp32.h>
 #define BLYNK_PRINT Serial
+#include <TimeLib.h>
+#include <WidgetRTC.h>
 
 //define the pins used by the LoRa transceiver module
 #define SCK 5
@@ -77,6 +79,14 @@ int counter;
 //Transmission interval
 int interval = 1;
 
+//Lock code and key
+int lockCode = 5478;
+int lockKey = 0;
+
+//twitter variables
+bool tweetEnable = true;
+bool tweet = true;
+
 //Blynk Terminal variables
 WidgetTerminal terminal(V7);
 String terminalString;
@@ -85,6 +95,12 @@ String terminalString;
 #define weatherInterval 900000L
 BlynkTimer timer;
 int weatherTimer = 1;
+
+//Initialize Preferences library object
+Preferences preferences;
+
+//Real Time Clock
+WidgetRTC rtc;
 
 /*****************************************************/
 /**************** Hive Data Functions ****************/
@@ -211,43 +227,52 @@ void pushBlynkData()
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
-void writeEEPROM()
+void writePersistent()
 {
-  int eeAddress = 0;
-  EEPROM.put(eeAddress, scaleFactor);
-  eeAddress += sizeof(scaleFactor);
-  EEPROM.put(eeAddress, offset);
-  eeAddress += sizeof(offset);
-  EEPROM.put(eeAddress, tareOffset);
-  eeAddress += sizeof(tareOffset);
-  EEPROM.put(eeAddress, interval);
-  eeAddress += sizeof(interval);
+  preferences.begin("persistent", false);
+  preferences.putLong("scaleFactor", scaleFactor);
+  preferences.putLong("offset", offset);
+  preferences.putLong("tareOffset", tareOffset);
+  preferences.end();
 }
 
-void readEEPROM()
+void readPersistent()
 {
-  int eeAddress = 0;
-  EEPROM.get(eeAddress, scaleFactor);
-  eeAddress += sizeof(scaleFactor);
-  EEPROM.get(eeAddress, offset);
-  eeAddress += sizeof(offset);
-  EEPROM.get(eeAddress, tareOffset);
-  eeAddress += sizeof(tareOffset);
-  EEPROM.get(eeAddress, interval);
-  eeAddress += sizeof(interval);
+  preferences.begin("persistent", false);
+  scaleFactor = preferences.getLong("scaleFactor", scaleFactor);
+  offset = preferences.getLong("offset", offset);
+  tareOffset = preferences.getLong("tareOffset", tareOffset);
+  preferences.end();
 }
 
 void sendLoraPacket (String packet)
 {
   Serial.println("In LoRa send Func");
   Serial.println("Sending packet: ");
-  
+
   LoRa.beginPacket();
   LoRa.print(packet);
   LoRa.endPacket();
-  
+
   Serial.print("sent: ");
   Serial.println(packet);
+}
+
+void twitterFunc(int bypass)
+{
+  if (((hour() == 15) && (tweetEnable) && (tweet)) || (bypass == 1))
+  {
+    String strWeight = String(int(weightLbs));
+    String strHumidity = String(int(hiveHumx));
+    String strHiveTemp = String(int(hiveTempF));
+    String strOutsideTemp = String(int(outsideTempF));
+    Blynk.tweet("Today's Beehive report! \n Current hive weight (lbs) = " + strWeight + "\n Current hive humidity (%RH) = " + strHumidity + "\n Current hive temp (F) = " + strHiveTemp + "\n Current outside temp (F) = " + strOutsideTemp + "\n report tag: " + random(10, 000));
+    tweet = false;
+  }
+  if (hour() != 15)
+  {
+    tweet = true;
+  }
 }
 
 /************************************************/
@@ -292,7 +317,10 @@ void setup()
   }
   Serial.println("Blynk Initializing OK!");
 
-  readEEPROM();
+  rtc.begin();
+  setSyncInterval(10 * 60);
+
+  readPersistent();
 
   getWeatherData();
 
@@ -318,6 +346,7 @@ void loop()
     getHiveData();
     pushBlynkData();
   }
+  twitterFunc(0);
 }
 
 /**********************************************************/
@@ -354,6 +383,18 @@ BLYNK_WRITE(V7)
   {
     clearTerminal();
   }
+  if (String("tweet") == terminalString)
+  {
+    twitter Func(1);
+  }
+  if (String("tweetEnable") == terminalString)
+  {
+    tweetEnable = true;
+  }
+  if (String("tweetFalse") == terminalString)
+  {
+    tweetEnable = false;
+  }
   if (String("help") == terminalString || String("Help") == terminalString || String("HELP") == terminalString)
   {
     clearTerminal();
@@ -379,16 +420,22 @@ BLYNK_WRITE(V7)
     terminal.println("==> Sets scale factor to val");
     terminal.println(" ");
     terminal.println("2~val");
-    terminal.println("==> Sets scale offset to val");
+    terminal.println("==> Sets scale offset to val (lbs)");
     terminal.println(" ");
     terminal.println("3~val");
-    terminal.println("==> Sets scale tareOffset to val");
+    terminal.println("==> Sets scale tareOffset to val (lbs)");
     terminal.println(" ");
     terminal.println("4~val");
-    terminal.println("==> Sets transmission interval to val");
+    terminal.println("==> Sets transmission interval to val (sec)");
     terminal.println(" ");
     terminal.println("hive reset");
     terminal.println("==> Resets hive controller");
+    terminal.println(" ");
+    terminal.println("tweet");
+    terminal.println("==> Forces a tweet");
+    terminal.println(" ");
+    terminal.println("tweetEnable/Disable");
+    terminal.println("==> Enables and Disables tweeting");
     terminal.println(" ");
     terminal.println("Text or call Jensen at 410-390-1670 for more help");
     terminal.flush();
@@ -401,7 +448,7 @@ BLYNK_WRITE(V7)
     terminal.println("==> Hive reset command sent");
     terminal.flush();
   }
-  
+
   if (terminalString.indexOf('~') != -1)
   {
     terminal.println(" ");
@@ -416,7 +463,7 @@ BLYNK_WRITE(V7)
     if (operation == 1)
     {
       scaleFactor = value;
-      writeEEPROM();
+      writePersistent();
       terminal.println("==> scaleFactor written");
       terminal.flush();
     }
@@ -424,14 +471,14 @@ BLYNK_WRITE(V7)
     if (operation == 2)
     {
       offset = value;
-      writeEEPROM();
+      writePersistent();
       terminal.println("==> offset written");
       terminal.flush();
     }
     if (operation == 3)
     {
       tareOffset = value;
-      writeEEPROM();
+      writePersistent();
       terminal.println("==> tareOffset written");
       terminal.flush();
     }
@@ -524,9 +571,59 @@ void clearTerminal()
   terminal.println(" ");
   terminal.println(" ");
   terminal.println(" ");
+  terminal.println(" ");
+  terminal.println(" ");
+  terminal.println(" ");
+  terminal.println(" ");
+  terminal.println(" ");
+  terminal.println(" ");
   terminal.flush();
 }
 
 /*******************************************************/
 /**************** BLYNK_WRITE Functions ****************/
 /*******************************************************/
+
+BLYNK_WRITE(V8)
+{
+  lockKey = param.asInt();
+}
+
+BLYNK_WRITE(V9)
+{
+  if (lockKey == lockCode)
+  {
+    tareOffset = noTareWeightLbs;
+    terminal.println("==> Tare Written");
+  }
+  else
+  {
+    terminal.println("==> Incorrect lock key");
+  }
+}
+
+BLYNK_WRITE(V10)
+{
+  if (lockKey == lockCode)
+  {
+    sendLoraPacket("reset hive");
+    terminal.println("==> Going down for reset now!");
+  }
+  else
+  {
+    terminal.println("==> Incorrect lock key");
+  }
+}
+
+BLYNK_WRITE(V11)
+{
+  if (lockKey == lockCode)
+  {
+    resetFunc();
+    terminal.println("==> Reset Command Sent");
+  }
+  else
+  {
+    terminal.println("==> Incorrect lock key");
+  }
+}
