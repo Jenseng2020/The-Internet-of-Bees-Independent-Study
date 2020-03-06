@@ -32,8 +32,9 @@
 #define BAND 915E6
 
 //Define HX711 Pins
-#define HX711_DOUT 12 
+#define HX711_DOUT 12
 #define HX711_SCK 13
+#define PWR_TRST 17
 
 //Lora Data
 String loraData;
@@ -57,36 +58,41 @@ Preferences preferences;
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
-void setup() 
+void setup()
 {
   //initialize Serial Monitor
   Serial.begin(115200);
   while (!Serial);
-  
+
   Serial.println("LoRa Hx711/si7021 Sender Test");
 
   //begin Lora
   SPI.begin(SCK, MISO, MOSI, SS); //SPI LoRa pins
   LoRa.setPins(SS, RST, DIO0); //setup LoRa transceiver module
-  if (!LoRa.begin(BAND)) //check if lora started 
+  if (!LoRa.begin(BAND)) //check if lora started
   {
     Serial.println("Starting LoRa failed!");
   }
   else
   {
-  Serial.println("LoRa Initializing OK!");//announce lora started ok
+    Serial.println("LoRa Initializing OK!");//announce lora started ok
   }
   delay(1000);
 
   //begin hX711
   scale.begin(HX711_DOUT, HX711_SCK);
-  if (!scale.is_ready())//check if hx711 started 
+
+  //power HX711
+  pinMode(PWR_TRST, OUTPUT);
+  digitalWrite(PWR_TRST, HIGH);
+
+  if (!scale.is_ready())//check if hx711 started
   {
     Serial.println("Starting Hx711 failed!");
   }
   else
   {
-  Serial.println("HX711 Initializing OK!");
+    Serial.println("HX711 Initializing OK!");
   }
   delay(1000);
 
@@ -97,14 +103,14 @@ void setup()
   }
   else
   {
-  Serial.println("si7021 Initializing OK!");
+    Serial.println("si7021 Initializing OK!");
   }
   delay(1000);
 
   readPersistent();
 }
 
-void loop() 
+void loop()
 {
   int packetSize = LoRa.parsePacket();
   Serial.println(packetSize);
@@ -115,28 +121,28 @@ void loop()
   Serial.println();
   Serial.print("Counter = ");
   Serial.println(counter);
-  sendLoraPacket(getRawWht(),getTemp(),getHumx(),counter);
+  sendLoraPacket(getRawWht(), getTemp(), getHumx(), counter);
   counter++;
   delay(intervalDelay);
 }
 
 float getTemp()
 {
-//  Serial.println("In temp func");
+  //  Serial.println("In temp func");
   float temp = si7021.readTemperature();
   return temp;
 }
 
 float getHumx()
 {
-//  Serial.println("In humx func");
+  //  Serial.println("In humx func");
   float humx = si7021.readHumidity();
   return humx;
 }
 
 long getRawWht()
 {
-//  Serial.println("In raw weight func");
+  //  Serial.println("In raw weight func");
   long scaleRaw = scale.read();
   return scaleRaw;
 }
@@ -144,8 +150,8 @@ long getRawWht()
 void sendLoraPacket (long rawWht, float temp, float humx, int counter)
 {
   //Serial.println("In LoRa Func");
-//  Serial.print("Sending packet: ");
-  
+  //  Serial.print("Sending packet: ");
+
   LoRa.beginPacket();
   LoRa.print(rawWht);
   LoRa.print("/");
@@ -158,14 +164,13 @@ void sendLoraPacket (long rawWht, float temp, float humx, int counter)
 
   LoRa.receive();
 
-  /*
   Serial.println("sent");
   Serial.print("Raw Weight: ");
-  Serial.print(rawWht);
+  Serial.print(rawWht); 
   Serial.print("\tTemp: ");
   Serial.print(temp);
   Serial.print("\tHumidity: ");
-  Serial.println(humx);*/
+  Serial.println(humx);
 }
 
 void readLoraPacket()
@@ -184,13 +189,13 @@ void readLoraPacket()
   Serial.print("with RSSI ");
   Serial.println(rssi);
 
-  if(loraData == String("hive reset"))
+  if (loraData == String("hive reset"))
   {
     resetFunc();
   }
 
   if (loraData.indexOf('~') != -1)
-  {  
+  {
     Serial.println("In set function");
     int stringLength = loraData.length() + 1;
     char strBuffer[stringLength] = "";
