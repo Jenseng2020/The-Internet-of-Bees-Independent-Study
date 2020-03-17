@@ -271,13 +271,13 @@ void twitterFunc(int bypass)
     String strHiveTemp = String(int(hiveTempF));
     String strOutsideTemp = String(int(outsideTempF));
     terminal.println("==> Tweeting");
+    Serial.println("==> Tweeting");
     terminal.flush();
     Serial.println("==> Tweeting");
     Serial.println(strWeight);
     Serial.println(strHumidity);
     Serial.println(strHiveTemp);
     Serial.println(strOutsideTemp);
-    //Blynk.tweet("Hello World");
     Blynk.tweet("Today's Beehive report! \n hive weight (lbs) = " + strWeight + "\n hive humidity (%RH) = " + strHumidity + "\n hive temp (F) = " + strHiveTemp + "\n outside temp (F) = " + strOutsideTemp);
     tweet = false;
   }
